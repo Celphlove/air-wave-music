@@ -5,7 +5,7 @@
 Stretch strings in the air, give each one an instrument, and play them with your fingers.
 A single-page, camera-tracked instrument that runs entirely in the browser.
 
-**Play it:** https://masterofvfx2070.github.io/music-maker/
+**Play it:** https://hashem-al-ghaili.github.io/music-maker/
 
 ## How it works
 
