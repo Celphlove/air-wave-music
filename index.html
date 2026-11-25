@@ -275,6 +275,11 @@ body.clean #songHud { display: none; }
   #shWords { font-size: 18px; } #shWords .cur { font-size: 23px; }
   .songrow { flex-wrap: wrap; } .songrow .grow { flex-basis: 100%; }
 }
+
+#handsBtn { display: none; }
+body.cam #handsBtn { display: inline-flex; }
+#handsBtn.off { background: #ff3df2; border-color: #ff3df2; color: #14021c; }
+@media (max-width: 760px), (max-height: 520px) { #handsBtn .lbl { display: none; } #handsBtn { width: 40px; padding: 0; justify-content: center; } }
 </style>
 </head>
 <body data-theme="city">
@@ -288,6 +293,7 @@ body.clean #songHud { display: none; }
   <div class="spacer"></div>
   <button id="shapeBtn" title="Stage shape: landscape 16:9 or vertical 9:16">16:9</button>
   <button id="recMode" title="What the Record button captures: the picture with sound, or the sound alone">Video + sound</button>
+  <button id="handsBtn" title="Pause hand tracking while you talk (key P)" aria-label="Pause hands">&#9995;<span class="lbl" id="handsLbl">Hands on</span></button>
   <button id="songsBtn" class="songsBtn">&#9835; Songs</button>
   <button id="recBtn"><span class="dot"></span><span id="recLabel">Record</span><span id="recTime"></span></button>
   <button id="filmBtn" title="Hide the controls, count 3-2-1 and record">Film</button>
@@ -390,6 +396,8 @@ body.clean #songHud { display: none; }
     </ul>
     <h3>If tracking struggles</h3>
     <ul>
+      <li><b>A menu popped up by accident?</b> Pinch anywhere outside it, or point at the pink <b>×</b> and hold still. It also closes by itself after a few seconds.</li>
+      <li><b>Talking or moving around?</b> Tap <b>✋ Hands</b> at the top (or press P) to pause hand tracking. Tap it again to play.</li>
       <li>Keep hands 40 to 80 cm from the camera, palms toward the screen, with light on them.</li>
       <li>If pinches are missed or fire too easily, adjust <b>Pinch sensitivity</b> in Settings.</li>
     </ul>
@@ -402,7 +410,8 @@ body.clean #songHud { display: none; }
   <div class="card">
     <h2>Settings</h2>
     <div class="set">
-      <label for="sSens">Pinch sensitivity<small>Higher closes the pinch sooner. Lower needs fingers to touch.</small></label><input id="sSens" type="range" min="0.6" max="1.7" step="0.05">
+      <label for="sSens">Pinch sensitivity<small>Lower means your fingers must really touch. Turn it down if menus open by accident.</small></label><input id="sSens" type="range" min="0.6" max="1.7" step="0.05">
+      <label for="sHold">Pinch hold time<small>How long a pinch must last before it counts. Longer means fewer accidental menus and strings.</small></label><input id="sHold" type="range" min="0" max="0.6" step="0.05">
       <label for="sAll">Play with every fingertip<small>Off: only the index finger plucks.</small></label><input id="sAll" type="checkbox">
       <label for="sQuant">Snap layers to the beat<small>Tidies the timing of what you record into a layer.</small></label><input id="sQuant" type="checkbox">
       <label for="sSkel">Show hand outline</label><input id="sSkel" type="checkbox">
@@ -906,7 +915,8 @@ const state = {
   counts: { plucks: 0, created: 0, clicks: 0 },
   mix: { live: 0.85, beat: 0.8 },
   settings: {
-    pinchSens: 1,
+    pinchSens: 0.9,
+    pinchHold: 0.2,
     allFingers: false,
     skeleton: true,
     labels: true,
@@ -1732,6 +1742,7 @@ function addString(p, q, opts = {}) {
   return s;
 }
 function removeString(s) {
+  state.noCreateUntil = nowS() + 1.2;
   for (const pid in s.holds) endHold(s, pid);
   state.strings = state.strings.filter(x => x !== s);
   if (state.menu && state.menu.s === s) state.menu = null;
@@ -2016,7 +2027,28 @@ function menuContains(p, slack) {
   return Math.hypot(p.x - M.cx, p.y - M.cy) < M.R + slack + 20;
 }
 function closeMenu() { state.menu = null; }
-const menuIdle = M => (M.grid ? 9 : M.fresh ? 7 : 6);   // seconds without a pointer nearby before it closes
+const menuIdle = M => (M.grid ? 6 : 5);   // seconds without a pointer nearby before it closes
+function menuCloseSpot(M) {               // the pink ×, just outside the menu's top-right corner
+  if (M.grid) {
+    const above = M.y0 - 34 > state.safeTop + 24;
+    return { x: clamp(M.x0 + M.pw - 24, 30, W - 30), y: above ? M.y0 - 34 : Math.min(M.y0 + M.ph + 34, state.safeBottom - 26), r: 24 };
+  }
+  return { x: clamp(M.cx + M.R + 30, 30, W - 30), y: clamp(M.cy - M.R - 16, state.safeTop + 30, H - 30), r: 24 };
+}
+function drawMenuClose(t) {
+  const M = state.menu; if (!M) return;
+  const c = menuCloseSpot(M), k = clamp((M.closeDwell || 0) / 0.6, 0, 1);
+  g.save();
+  g.shadowColor = '#ff3df2'; g.shadowBlur = M.closeHover ? 22 : 10;
+  g.fillStyle = M.closeHover ? 'rgba(255,61,242,0.35)' : 'rgba(12,4,26,0.85)';
+  g.beginPath(); g.arc(c.x, c.y, c.r, 0, 7); g.fill();
+  g.strokeStyle = '#ff3df2'; g.lineWidth = 2.5; g.beginPath(); g.arc(c.x, c.y, c.r, 0, 7); g.stroke();
+  g.shadowBlur = 0; g.strokeStyle = '#ffffff'; g.lineWidth = 3.5; g.lineCap = 'round';
+  const d = c.r * 0.38;
+  g.beginPath(); g.moveTo(c.x - d, c.y - d); g.lineTo(c.x + d, c.y + d); g.moveTo(c.x + d, c.y - d); g.lineTo(c.x - d, c.y + d); g.stroke();
+  if (k > 0) { g.strokeStyle = '#ffffff'; g.lineWidth = 3; g.beginPath(); g.arc(c.x, c.y, c.r + 5, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); g.stroke(); }
+  g.restore();
+}   // seconds without a pointer nearby before it closes
 
 function chooseMenu(it) {
   const M = state.menu, s = M.s;
@@ -2052,8 +2084,12 @@ function updateMenu(pointers, dt) {
   const M = state.menu;
   if (!M) return;
   const t = nowS();
-  const HIT = 36, DWELL = 0.8;
+  const HIT = 36, DWELL = 1.0;
   let chosen = null;
+  const c = menuCloseSpot(M);
+  M.closeHover = pointers.some(p => Math.hypot(p.x - c.x, p.y - c.y) < c.r + 10);
+  M.closeDwell = M.closeHover && t - M.opened > 0.35 ? (M.closeDwell || 0) + dt : 0;
+  if (M.closeHover && (pointers.some(p => p.press && Math.hypot(p.x - c.x, p.y - c.y) < c.r + 10) || M.closeDwell >= 0.6)) { closeMenu(); return; }
   for (const it of M.items) {
     let over = false, pressed = false;
     for (const p of pointers) {
@@ -2113,6 +2149,7 @@ async function startCamera(setStatus) {
   setStatus('Loading the hand tracker…');
   await loadTracker();
   state.mode = 'camera';
+  document.body.classList.add('cam');
 }
 
 // camera frame → mirrored canvas coordinates, matching how the picture is drawn ("cover" fit)
@@ -2177,7 +2214,7 @@ function processHands(dets, t) {
       if (h.intent === 'fx') endFx();
       h.intent = 'create';
     }
-    state.preview = { a: { ...a.cursor }, b: { ...b.cursor } };
+    state.preview = { a: { ...a.cursor }, b: { ...b.cursor }, born: (state.preview && state.preview.born) || t };
   }
   slots.forEach((h, j) => {
     if (!h || !h.present || !h.pinch) return;
@@ -2220,7 +2257,10 @@ function updateHand(j, d, t) {
   h.cursor = { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
   const sens = state.settings.pinchSens, down = 0.3 * sens, up = 0.46 * sens;
   if (!h.pinch) {
-    if (h.ratio < down) { if (++h.pc >= 2) { h.pinch = true; h.pc = 0; pinchDown(h, t); } } else h.pc = 0;
+    if (h.ratio < down) {
+      if (!h.pcT) h.pcT = t;
+      if (t - h.pcT >= state.settings.pinchHold) { h.pinch = true; h.pc = 0; h.pcT = 0; pinchDown(h, t); }
+    } else h.pcT = 0;
   } else {
     if (h.ratio > up) { if (++h.pc >= 2) { h.pinch = false; h.pc = 0; pinchUp(j, t); } } else h.pc = 0;
   }
@@ -2235,7 +2275,11 @@ function updateHand(j, d, t) {
 function pinchDown(h, t) {
   h.pinchT = t; h.pinchStart = { ...h.cursor }; h.press = true;
   forgetPointer('h' + state.hands.indexOf(h) + '-');
-  if (state.menu) { h.intent = 'menu'; return; }
+  if (state.menu) {
+    const c = menuCloseSpot(state.menu);
+    if (!menuContains(h.cursor, 30) && dist(h.cursor, c) > c.r + 16) { closeMenu(); h.intent = 'used'; return; }
+    h.intent = 'menu'; return;
+  }
   if (modalOpen()) { h.intent = 'tap'; return; }
   const ep = nearestEndpoint(h.cursor, 36);
   if (ep) { h.intent = 'drag'; h.drag = ep; return; }
@@ -2252,8 +2296,9 @@ function pinchUp(j, t) {
     const pv = state.preview;
     state.preview = null;
     if (other) other.intent = 'used';
-    if (pv && dist(pv.a, pv.b) >= 90) addString(pv.a, pv.b);
-    else if (pv) toast('Pull your hands further apart to make a string.');
+    const held = pv && t - (pv.born || t) > 0.35, calm = t > (state.noCreateUntil || 0);
+    if (pv && held && calm && dist(pv.a, pv.b) >= 130) addString(pv.a, pv.b);
+    else if (pv && held && calm && dist(pv.a, pv.b) >= 60) toast('Pull your hands further apart to make a string.');
   } else if (h.intent === 'drag') {
     const s = h.drag.s;
     orient(s);
@@ -2514,6 +2559,7 @@ function iconImg(id, color, px) {
   return canvas;
 }
 function drawIcon(id, color, x, y, px) {
+  if (!(px >= 1)) return;          // menus grow from nothing as they open
   g.drawImage(iconImg(id, color, px), x - px / 2, y - px / 2, px, px);
 }
 
@@ -2805,7 +2851,7 @@ function drawPalette(M, t) {
     label(it.label, it.x, it.y + 26, 11.5, it.hover ? INK : 'rgba(243,239,230,0.92)', 'center', it.hover || it.on ? 700 : 500, false);
     if (it.dwell > 0) {                                              // hold-to-choose progress
       g.save(); rrect(x, y, it.w, it.h, 11); g.clip();
-      g.fillStyle = INK; g.fillRect(x, y + it.h - 6, it.w * clamp(it.dwell / 0.8, 0, 1), 6);
+      g.fillStyle = INK; g.fillRect(x, y + it.h - 6, it.w * clamp(it.dwell / 1.0, 0, 1), 6);
       g.restore();
     }
   }
@@ -2843,7 +2889,7 @@ function drawMenu(t) {
     if (it.on && !it.hover && M.kind !== 'key') { g.fillStyle = it.color; g.beginPath(); g.arc(x, y, 6 * e, 0, 7); g.fill(); }   // current choice
     if (it.dwell > 0) {
       g.strokeStyle = IVORY; g.lineWidth = 4;
-      g.beginPath(); g.arc(x, y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(it.dwell / 0.8, 0, 1)); g.stroke();
+      g.beginPath(); g.arc(x, y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(it.dwell / 1.0, 0, 1)); g.stroke();
     }
     if (it.icon) drawIcon(it.icon, it.hover ? '#10141a' : it.color, x, y, r * 1.25);
     // name sits outside the ring; short names (keys) sit inside the dot
@@ -2912,6 +2958,7 @@ function render(t, dt) {
   drawParticles(dt);
   drawPops(t);
   drawMenu(t);
+  drawMenuClose(t);
   drawHands(t);
   drawDebug();
 }
@@ -3585,12 +3632,14 @@ function initUI() {
 
   // settings
   const S = state.settings;
+  try { Object.assign(S, JSON.parse(localStorage.getItem('airwave-settings-v1') || '{}')); } catch (_) {}
+  const saveS = () => { try { localStorage.setItem('airwave-settings-v1', JSON.stringify(S)); } catch (_) {} };
   const bind = (id, key, fn) => {
     const el = $('#' + id);
-    if (el.type === 'checkbox') { el.checked = S[key]; el.addEventListener('change', () => { S[key] = el.checked; fn && fn(); }); }
-    else { el.value = S[key]; el.addEventListener('input', () => { S[key] = +el.value; fn && fn(); }); }
+    if (el.type === 'checkbox') { el.checked = S[key]; el.addEventListener('change', () => { S[key] = el.checked; saveS(); fn && fn(); }); }
+    else { el.value = S[key]; el.addEventListener('input', () => { S[key] = +el.value; saveS(); fn && fn(); }); }
   };
-  bind('sSens', 'pinchSens'); bind('sAll', 'allFingers'); bind('sSkel', 'skeleton'); bind('sDim', 'dim'); bind('sLabels', 'labels');
+  bind('sSens', 'pinchSens'); bind('sHold', 'pinchHold'); bind('sAll', 'allFingers'); bind('sSkel', 'skeleton'); bind('sDim', 'dim'); bind('sLabels', 'labels');
   bind('sQuant', 'quantize'); bind('sDebug', 'debug');
   bind('sVol', 'volume', () => { if (audio.master) audio.master.gain.value = S.volume; });
 
@@ -3622,6 +3671,7 @@ function initUI() {
     if (e.key === 'f' || e.key === 'F') $('#filmBtn').click();
     if (e.key === 'z' || e.key === 'Z') undoLayer();
     if (e.key === 'h' || e.key === 'H') toggleClean();
+    if ((e.key === 'p' || e.key === 'P') && state.mode === 'camera') toggleHands();
     if (e.key === 'Escape') {
       if (film.on || film.counting) { stopFilm(); return; }
       closeMenu(); $$('.modal.open').forEach(m => m.id !== 'startModal' && m.classList.remove('open'));
@@ -3640,7 +3690,7 @@ function frame() {
   lastT = t;
   if (++fpsN && t - fpsT > 1) { state.fps = Math.round(fpsN / (t - fpsT)); fpsN = 0; fpsT = t; }
   try {
-    const dets = state.mode === 'camera' ? readHands(t) : state.mode === 'demo' ? demoHands(t) : null;
+    const dets = state.mode === 'camera' ? (state.handsPaused ? null : readHands(t)) : state.mode === 'demo' ? demoHands(t) : null;
     if (dets) processHands(dets, t);
     const mo = state.mouse;      // the mouse plays like a fingertip: checked every frame, so resting on a string counts
     if (mo.inside && !mo.down && mo.x >= 0 && state.mode !== 'idle' && !modalOpen()) sweep('mouse', mo, t);
@@ -3969,6 +4019,14 @@ function initSongs() {
   });
 }
 
+function toggleHands() {
+  state.handsPaused = !state.handsPaused;
+  if (state.handsPaused) { dropHand(0); dropHand(1); state.preview = null; closeMenu(); }
+  $('#handsBtn').classList.toggle('off', !!state.handsPaused);
+  $('#handsLbl').textContent = state.handsPaused ? 'Hands paused' : 'Hands on';
+  toast(state.handsPaused ? 'Hands paused. Tap ✋ (or press P) to play again.' : 'Hands back on.');
+}
+
 // if the phone has paused the sound (camera players never tap the screen), offer one big button to bring it back
 function checkSound() {
   const off = state.mode !== 'idle' && audio.ctx && audio.ctx.state !== 'running' && !modalOpen();
@@ -4010,6 +4068,7 @@ function boot() {
   initUI();
   initMenu();
   initSongs();
+  $('#handsBtn').addEventListener('click', toggleHands);
   // any real tap or key turns the sound on (phones only allow it inside a tap, not a touch-down)
   for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => initAudio(), { capture: true, passive: true });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && audio.ctx && audio.ctx.state !== 'running') audio.ctx.resume().catch(() => {}); });
