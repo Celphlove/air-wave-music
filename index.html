@@ -221,6 +221,31 @@ body[data-theme="city"] #dock { border-top-color: rgba(178, 107, 255, 0.5); box-
 body[data-theme="city"] .card { background: rgba(12, 5, 26, 0.78); border-color: rgba(255, 61, 242, 0.45); box-shadow: 0 0 40px rgba(255, 61, 242, 0.22), inset 0 0 30px rgba(178, 107, 255, 0.08); }
 body[data-theme="city"] .card h1 b { color: #ff3df2; text-shadow: 0 0 18px rgba(255, 61, 242, 0.8); }
 body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
+
+/* ── phone layout: one tidy row top and bottom, everything else under Menu ── */
+#menuBtn { display: none; }
+.burger { display: inline-grid; gap: 3px; }
+.burger i { display: block; width: 14px; height: 2px; border-radius: 2px; background: currentColor; }
+.modal.sheet { place-items: end center; padding: 0; }
+.sheet .card { width: min(640px, 100%); border-radius: 22px 22px 0 0; max-height: 84dvh; padding: 18px 18px max(22px, env(safe-area-inset-bottom)); }
+.sheethead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.sheethead h2 { margin: 0; }
+.sheet h3 { margin: 16px 0 8px; }
+.sgrid { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sgrid .chips { flex-wrap: wrap; }
+.sgrid .lab { display: inline; }
+#soundGate { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 25; height: 54px; padding: 0 24px; font-size: 16px; }
+@media (max-width: 760px), (max-height: 520px) {
+  #menuBtn { display: inline-flex; }
+  #top { overflow: visible; }
+  #top .spacer { display: block; flex: 1; }
+  #dock { flex-direction: row; align-items: center; overflow: visible; }
+  #dock .row { display: contents; }
+  #dock .lab, #dock .sep, #leds { display: none !important; }
+  #playBtn { order: 1; } #layerBtn { order: 2; } #undoLayer { order: 3; } #chordNow { order: 4; margin-left: auto; }
+  .sgrid button.sq { width: 40px; height: 40px; }
+  .sgrid button { height: 40px; }
+}
 </style>
 </head>
 <body data-theme="city">
@@ -229,8 +254,8 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
 
 <header id="top" class="bar">
   <div class="brand">String <b>Mirror</b></div>
-  <div class="group"><span class="lab">Key</span><button id="keyDown" class="sq" aria-label="Key down">‹</button><span id="keyVal" class="val"></span><button id="keyUp" class="sq" aria-label="Key up">›</button></div>
-  <div class="group"><span class="lab">Tone</span><button id="toneDown" class="sq" aria-label="Previous tone">‹</button><span id="toneVal" class="val wide"></span><button id="toneUp" class="sq" aria-label="Next tone">›</button></div>
+  <div id="grpKey" class="group"><span class="lab">Key</span><button id="keyDown" class="sq" aria-label="Key down">‹</button><span id="keyVal" class="val"></span><button id="keyUp" class="sq" aria-label="Key up">›</button></div>
+  <div id="grpTone" class="group"><span class="lab">Tone</span><button id="toneDown" class="sq" aria-label="Previous tone">‹</button><span id="toneVal" class="val wide"></span><button id="toneUp" class="sq" aria-label="Next tone">›</button></div>
   <div class="spacer"></div>
   <button id="shapeBtn" title="Stage shape: landscape 16:9 or vertical 9:16">16:9</button>
   <button id="recMode" title="What the Record button captures: the picture with sound, or the sound alone">Video + sound</button>
@@ -240,7 +265,8 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
   <button id="clearBtn">Clear</button>
   <button id="helpBtn">Help</button>
   <button id="setBtn">Settings</button>
-  <button id="cleanBtn" title="Hide the controls for a bigger stage">Hide</button>
+  <button id="cleanBtn" title="Hide the controls for a bigger stage">Hide controls</button>
+  <button id="menuBtn" aria-label="Open the menu"><span class="burger"><i></i><i></i><i></i></span>Menu</button>
 </header>
 <div id="filmBar"><span class="dot"></span><span id="filmTime">0:00</span><button id="filmStop">Stop</button><button id="cleanExit">Show controls</button></div>
 <div id="count" aria-hidden="true"></div>
@@ -252,7 +278,7 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
   <div class="row">
     <button id="playBtn"><i></i><span id="playLabel">Play</span></button>
     <span class="lab">Beat</span><div id="beatChips" class="chips"></div>
-    <div class="group"><span class="lab">Tempo</span><button id="bpmDown" class="sq" aria-label="Slower">−</button><span id="bpmVal" class="val"></span><button id="bpmUp" class="sq" aria-label="Faster">+</button></div>
+    <div id="grpTempo" class="group"><span class="lab">Tempo</span><button id="bpmDown" class="sq" aria-label="Slower">−</button><span id="bpmVal" class="val"></span><button id="bpmUp" class="sq" aria-label="Faster">+</button></div>
     <button id="followBtn" class="chip" title="Strings retune to the chord the beat is playing, so everything fits">Follow chords</button><span id="chordNow" class="val"></span>
     <div id="leds" aria-hidden="true"></div>
   </div>
@@ -261,7 +287,7 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
     <span class="sep"></span>
     <span class="lab">Your layers</span>
     <button id="layerBtn"><span class="dot"></span><span id="layerLabel">Record a layer</span></button>
-    <div class="group"><button id="barsDown" class="sq" aria-label="Shorter layer">‹</button><span id="barsVal" class="val mid"></span><button id="barsUp" class="sq" aria-label="Longer layer">›</button></div>
+    <div id="grpBars" class="group"><button id="barsDown" class="sq" aria-label="Shorter layer">‹</button><span id="barsVal" class="val mid"></span><button id="barsUp" class="sq" aria-label="Longer layer">›</button></div>
     <button id="undoLayer" title="Remove the layer you added last">Undo</button>
     <button id="mixBtn" title="Volumes, and export of separate audio files">Mixer</button>
     <div id="layerChips" class="chips"></div>
@@ -304,7 +330,8 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
       <li><b>Make a string:</b> put two fingers on an empty spot at the same moment, pull them apart, then lift them.</li>
       <li><b>Play it:</b> swipe a finger across a string, or tap it. Use several fingers at once to strum. Rest a finger on a string to hold the note.</li>
       <li><b>Change it:</b> tap the dot in the middle of a string. Drag an end to resize it.</li>
-      <li><b>More room:</b> swipe the control bars sideways to reach every button. <b>Hide</b> clears the controls, and <b>Show controls</b> brings them back. Turn the phone sideways for the wide stage.</li>
+      <li><b>Controls:</b> Play and your layers sit at the bottom. Everything else, like the beat, key, tempo, setups and settings, is under <b>Menu</b> at the top. Turn the phone sideways for the wide stage.</li>
+      <li><b>No sound?</b> Turn the volume up and tap the screen once. On an iPhone, check the silent switch on the side too.</li>
     </ul>
     <h3>Pointing and pressing</h3>
     <ul>
@@ -387,6 +414,19 @@ body[data-theme="city"] .lab { color: rgba(196, 150, 255, 0.8); }
     </div>
   </div>
 </div>
+
+<div id="menuModal" class="modal sheet">
+  <div class="card">
+    <div class="sheethead"><h2>Controls</h2><button class="sq" data-close="menuModal" aria-label="Close menu">×</button></div>
+    <h3>Sound</h3><div class="sgrid" data-slot="sound"></div>
+    <h3>Beat</h3><div class="sgrid" data-slot="beat"></div>
+    <h3>Beat parts</h3><div class="sgrid" data-slot="parts"></div>
+    <h3>Your layers</h3><div class="sgrid" data-slot="layers"></div>
+    <h3>Recording</h3><div class="sgrid" data-slot="rec"></div>
+    <h3>More</h3><div class="sgrid" data-slot="more"></div>
+  </div>
+</div>
+<button id="soundGate" class="primary hide">Tap here to turn on the sound</button>
 
 <div id="saveModal" class="modal">
   <div class="card">
@@ -905,11 +945,31 @@ function buildGraph(ctx, o = {}) {
   if (!o.offline) { G.recDest = ctx.createMediaStreamDestination(); out.connect(G.recDest); }
   return G;
 }
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && (navigator.maxTouchPoints || 0) > 1);
+const SILENT_WAV = 'data:audio/wav;base64,UklGRvQHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YdAHAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+let sessionSet = false, silentEl = null;
 function initAudio() {
-  if (audio.ctx) { if (audio.ctx.state !== 'running') audio.ctx.resume(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  Object.assign(audio, buildGraph(new AC({ latencyHint: 'interactive' })));
-  audio.ready = true;
+  if (!audio.ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    Object.assign(audio, buildGraph(new AC({ latencyHint: 'interactive' })));
+    audio.ready = true;
+  }
+  if (!sessionSet) {          // iPhone: treat this like music, so the silent switch doesn't mute it
+    sessionSet = true;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
+  }
+  if (IOS && !silentEl) {     // older iPhones: a silent looping track does the same job
+    silentEl = new Audio(SILENT_WAV);
+    silentEl.loop = true; silentEl.setAttribute('playsinline', '');
+    silentEl.play().catch(() => { silentEl = null; });
+  }
+  if (audio.ctx.state !== 'running') {
+    audio.ctx.resume().catch(() => {});
+    try {                     // a one-sample sound inside the tap wakes audio on older phones
+      const b = audio.ctx.createBuffer(1, 1, 22050), s = audio.ctx.createBufferSource();
+      s.buffer = b; s.connect(audio.ctx.destination); s.start(0);
+    } catch (_) {}
+  }
 }
 // brightness sweeps down (dark) or up (thin); echo is 0..1
 function setFx(dark, thin, echo) {
@@ -3662,10 +3722,51 @@ async function runDemo() {
   }
 }
 
+// if the phone has paused the sound (camera players never tap the screen), offer one big button to bring it back
+function checkSound() {
+  const off = state.mode !== 'idle' && audio.ctx && audio.ctx.state !== 'running' && !modalOpen();
+  $('#soundGate').classList.toggle('hide', !off);
+}
+
+// ───────────────────────── phones: controls live in the Menu sheet ─────────────────────────
+const SHEET = {
+  sound: ['grpKey', 'grpTone', 'grpTempo', 'followBtn'], beat: ['beatChips'], parts: ['partChips'],
+  layers: ['grpBars', 'mixBtn', 'layerChips'], rec: ['recMode', 'shapeBtn', 'filmBtn', 'cleanBtn'],
+  more: ['setupsBtn', 'clearBtn', 'helpBtn', 'setBtn'],
+};
+const phoneMQ = matchMedia('(max-width: 760px), (max-height: 520px)');
+const homes = new Map();
+function placeControls() {
+  const phone = phoneMQ.matches;
+  for (const [slot, ids] of Object.entries(SHEET)) for (const id of ids) {
+    const el = $('#' + id);
+    if (!el) continue;
+    if (!homes.has(id)) { const mark = document.createComment(id); el.before(mark); homes.set(id, mark); }
+    if (phone) $(`#menuModal [data-slot="${slot}"]`).appendChild(el);
+    else homes.get(id).after(el);
+  }
+  if (!phone) closeModal('menuModal');
+  layoutStage();
+}
+function initMenu() {
+  placeControls();
+  phoneMQ.addEventListener('change', placeControls);
+  $('#menuBtn').addEventListener('click', () => { initAudio(); openModal('menuModal'); });
+  // these open something else or change the view, so the sheet steps aside
+  for (const id of ['setupsBtn', 'helpBtn', 'setBtn', 'mixBtn', 'filmBtn', 'cleanBtn', 'clearBtn'])
+    $('#' + id).addEventListener('click', () => { if ($('#' + id).closest('#menuModal')) closeModal('menuModal'); });
+}
+
 // ───────────────────────── boot ─────────────────────────
 function boot() {
   g = $('#stage').getContext('2d');
   initUI();
+  initMenu();
+  // any real tap or key turns the sound on (phones only allow it inside a tap, not a touch-down)
+  for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => initAudio(), { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && audio.ctx && audio.ctx.state !== 'running') audio.ctx.resume().catch(() => {}); });
+  $('#soundGate').addEventListener('click', () => { initAudio(); setTimeout(checkSound, 200); });
+  setInterval(checkSound, 1000);
   state.lastInput = TOUCH ? 'touch' : 'mouse';
   autoShape();
   if (TOUCH) {
