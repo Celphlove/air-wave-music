@@ -1768,6 +1768,7 @@ function clearStrings() {
 
 // Sound a string at position u (0..1 along it).
 function pluck(s, u, vel, down, quiet) {
+  if (song.on && s === song.s && song.mode === 'play' && !song.armed && !quiet) return;   // still touching from the last hit
   initAudio();
   const n = zoneCount(s), z = clamp(Math.floor(u * n), 0, n - 1);
   const info = zoneInfo(s, z);
@@ -3890,7 +3891,7 @@ function startSong(id, mode) {
   const y = H * (W > H ? 0.6 : 0.58);
   const s = addString({ x: W * 0.07, y }, { x: W * 0.93, y }, { inst: def.inst, silent: true, scale: 'major', root: 0, oct: def.oct });
   s.zones = def.hi - def.lo + 1; s.zoff = def.lo; s.song = true;
-  Object.assign(song, { on: true, def, mode, i: 0, s, nextT: nowS() + 1.4, doneT: 0 });
+  Object.assign(song, { on: true, def, mode, i: 0, s, nextT: nowS() + 1.4, doneT: 0, armed: true, hitT: 0 });
   $('#songHud').classList.remove('hide');
   updateSongHud(); refreshUI();
 }
@@ -3908,6 +3909,7 @@ function songPoint(z) { const s = song.s, u = songU(z); return { x: lerp(s.a.x, 
 
 function songHit(s, z) {
   if (song.mode !== 'play' || s !== song.s || song.i >= song.def.notes.length) return;
+  song.armed = false; song.hitT = nowS();          // one hit per swipe: re-arms once the finger leaves the string
   if (z !== songZone(song.i)) { song.miss = { z, t: nowS() }; return; }
   burst(songPoint(z), '#ff3df2', 10, 140);
   song.i++;
@@ -3922,9 +3924,22 @@ function finishSong() {
   }
   updateSongHud();
 }
+// every fingertip, mouse pointer and finger on the screen that could be playing right now
+function songPointers() {
+  const P = [];
+  for (const h of state.hands) {
+    if (!h || !h.present || !h.lm) continue;
+    for (const k of state.settings.allFingers ? [8, 12, 16, 20] : [8]) P.push(h.lm[k]);
+  }
+  const m = state.mouse;
+  if (m.inside && m.x >= 0) P.push(m);
+  for (const T of touches.values()) if (!T.gone) P.push(T);
+  return P;
+}
 function songFrame(t) {
   if (!song.on) return;
   if (!state.strings.includes(song.s)) { exitSong(); return; }
+  if (song.mode === 'play' && !song.armed && t - song.hitT > 0.12 && !songPointers().some(p => distToString(p, song.s) < 36)) song.armed = true;
   if (song.mode === 'watch' && song.i < song.def.notes.length && t >= song.nextT) {
     const n = song.def.notes[song.i], z = songZone(song.i);
     pluck(song.s, songU(z), 0.8, true);
